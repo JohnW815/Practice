@@ -9,11 +9,16 @@ const Heading = (props) => {
     const[isOpen, setIsOpen] = useState(false);
     const toggle = () => setIsOpen(!isOpen);
 
-    const user = useRef(firebase.auth().currentUser.getIdTokenResult())
+    const [user,setUser] = useState(null);
 
     useEffect(() => {
-        console.log(user)
+        if(!props.auth.isEmpty){
+            setUser(firebase.auth().currentUser.getIdTokenResult());
+        }
+        console.log(user);
     },[props.data])
+
+    console.log(user);
 
     return(
         <div>
