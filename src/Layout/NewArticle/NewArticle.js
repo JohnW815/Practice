@@ -1,13 +1,18 @@
-import React,{ useState, useRef } from 'react';
+import React,{ useState } from 'react';
 import classes from './NewArticle.module.css'
 import { Container, Row, Col, Card,CardHeader, CardBody, FormGroup, Label, Input, Button } from 'reactstrap'
+import Compressor from 'compressorjs'
 
-import ReactQuill, {Quill} from 'react-quill'
+import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 
-const NewArticle = (props) => {
+import firebase from '../../Config/firebase'
+import {v4 as uuidv4} from 'uuid'
 
-    const quillRef = useRef(null)
+const db = firebase.firestore()
+const storageRef = firebase.storage()
+
+const NewArticle = (props) => {
 
     const [article,setArticle] = useState({
                                        title: '',
@@ -19,13 +24,17 @@ const NewArticle = (props) => {
                                        isPublish: false
                                     })
 
+    const quillRef = React.useRef(null);
+
+    const [hasFeatureImage,setHasFeatureImage] = useState(false);
+
     const modules = {
         toolbar: [
           [{ 'header': [1, 2, false] }],
           ['bold', 'italic', 'underline','strike', 'blockquote'],
           [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
-          ['link', 'image'],
-          ['clean']
+          ['link', {'image': () => quillImageCallBack()}],
+          ['clean'],
         ],
     }
 
@@ -46,6 +55,81 @@ const NewArticle = (props) => {
 
     const onChangePublish = (val) => {
               setArticle(article => ({...article, isPublish: val === 'True'}))
+    }
+
+    const submitArticle = () => {
+        const newArticle = article;
+        newArticle.createUserID = props.auth.uid;
+        db.collection("Article")
+            .add(article)
+            .then(res => {
+                console.log(res)
+            })
+            .catch(err => console.log(err))
+    }
+
+    const fileCompress = (file) => {
+        return new Promise((resolve,reject) => {
+            new Compressor(file,{
+                file:'File',
+                quality: 0.5,
+                maxWidth: 640,
+                maxHeight: 640,
+                success(file){
+                    return resolve({
+                        success: true,
+                        file: file
+                    })
+                },
+                error(err){
+                    return resolve({
+                        success: false,
+                        message: err.message
+                    })
+                }
+            })
+        })
+    }
+
+    const quillImageCallBack = () => {
+        const input = document.createElement('input');
+        input.setAttribute('type','file')
+        input.setAttribute('accept','image/*')
+        input.click()
+        input.onchange = async () => {
+            const file = input.files[0]
+            const compressState = await fileCompress(file)
+            if(compressState.success){
+                console.log(compressState);
+                const fileName = uuidv4();
+                storageRef.ref().child("Article/" + fileName).put(compressState.file)
+                    .then( async snapshot => {
+
+                        const downloadURL = await storageRef.ref().child("Article/" + fileName).getDownloadURL();
+                        let quill = quillRef.getEditor();
+                        const range = quill.getSelection(true)
+                        quill.insertEmbed(range.index, 'image', downloadURL)
+                    })
+            }
+        }
+    }
+
+    const uploadImageCallBack = (e) => {
+        return new Promise(async (resolve,reject) => {
+            const file = e.target.files[0];
+            const fileName = uuidv4();
+            storageRef.ref().child("Article/" + fileName).put(file)
+                .then( async snapshot => {
+
+                    const downloadURL = await storageRef.ref().child("Article/" + fileName).getDownloadURL();
+                    console.log(downloadURL)
+
+                    resolve({
+                        success:true,
+                        data: {link:downloadURL}
+                    })
+                })
+        })
     }
 
     return(
@@ -86,7 +170,26 @@ const NewArticle = (props) => {
                                 </Input>
                             </FormGroup>
                             <FormGroup>
-                                <Button color='danger' onClick={(e) => console.log(article)}>
+                                <Label className={classes.Label}>Feature Image</Label>
+                                <Input type='file' accept='image/*' className={classes.ImageUploader}
+                                    onChange={async (e) => {
+                                        const uploadState = await uploadImageCallBack(e);
+                                        if(uploadState.success){
+                                            setHasFeatureImage(true);
+                                            setArticle(article => ({...article, featureImage: uploadState.data.link}))
+                                        }
+                                    }}
+                                >
+                                </Input>
+
+                                {
+                                    hasFeatureImage ?
+                                        <img src={article.featureImage} alt="Your selection" className={classes.FeatureImg}/> : ''
+                                }
+
+                            </FormGroup>
+                            <FormGroup>
+                                <Button color='danger' onClick={(e) => submitArticle()}>
                                     Submit
                                 </Button>
                             </FormGroup>

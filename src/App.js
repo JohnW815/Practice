@@ -10,25 +10,15 @@ import ViewArticle from './Layout/ViewArticle/ViewArticle'
 import NewArticle from './Layout/NewArticle/NewArticle'
 import LoginPage from "./Layout/LoginPage/LoginPage"
 
+import RouterManager from './Layout/RouterManager/RouterManager'
+
 function App() {
   return (
     <div className="App">
       <Provider store={getReduxStore()}>
           <ReactReduxFirebaseProvider {...getRrfProp()}>
               <Router>
-                <Heading />
-                <Route path="/" exact>
-                    <Main />
-                </Route>
-                <Route path="/login">
-                    <LoginPage />
-                </Route>
-                <Route path="/article/:id">
-                    <ViewArticle />
-                </Route>
-                <Route path='/new-article'>
-                    <NewArticle />
-                </Route>
+                <RouterManager />
               </Router>
           </ReactReduxFirebaseProvider>
       </Provider>
